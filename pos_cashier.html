@@ -1,0 +1,446 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>نظام كاشير محلي - متجر سامح</title>
+<style>
+  :root{--primary:#2e8ab8;--accent:#2f9d5a;--muted:#6b6b6b;font-family:"Segoe UI",Tahoma,Arial,sans-serif}
+  body{margin:0;background:#f6fbfd;color:#023044}
+  header{background:linear-gradient(90deg,var(--primary),#3aa0d0);color:white;padding:12px 16px;display:flex;justify-content:space-between;align-items:center}
+  .brand{font-weight:800;font-size:18px}
+  .controls{display:flex;gap:8px;align-items:center}
+  button{border:0;padding:8px 12px;border-radius:8px;cursor:pointer;font-weight:700}
+  button.primary{background:white;color:var(--primary)}
+  button.ghost{background:transparent;color:white;border:1px solid rgba(255,255,255,0.12)}
+  main{padding:14px}
+  .panel{display:flex;gap:12px;align-items:flex-start}
+  .card{background:white;border-radius:8px;padding:12px;box-shadow:0 6px 18px rgba(6,30,40,0.04);flex:1}
+  label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
+  select,input[type="number"],input[type="text"]{width:100%;padding:8px;border:1px solid #e2eef6;border-radius:6px;font-size:14px}
+  .row{display:flex;gap:8px}
+  .row > *{flex:1}
+  table{width:100%;border-collapse:collapse;margin-top:12px}
+  th,td{padding:8px;border:1px solid #e6f0f6;text-align:center;font-size:14px}
+  thead th{background:linear-gradient(180deg,#3aa0d0,#2e8ab8);color:white}
+  tfoot td{font-weight:800;background:#f4fff4}
+  .small{font-size:12px;color:var(--muted)}
+  .right{text-align:right}
+  .actions{display:flex;gap:8px;align-items:center}
+  .total-card{background:#daf6dc;padding:8px;border-radius:8px;font-weight:800;color:#055b2a}
+  .remove-btn{background:#ff6b6b;color:white;border-radius:6px;padding:6px 8px;cursor:pointer}
+  @media print{
+    header, .controls, .actions, .card .save-area{display:none}
+    body{background:white}
+    table{font-size:13px}
+    th,td{border:1px solid #000}
+  }
+  /* small responsive */
+  @media (max-width:900px){
+    .panel{flex-direction:column}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">سامح - POS (نسخة محلية)</div>
+  <div class="controls">
+    <div class="small">الفاتورة #: <span id="invoiceNo"></span></div>
+    <div class="small">الوقت: <span id="nowLabel"></span></div>
+    <button class="primary" id="printBtn">🖨️ طباعة</button>
+    <button class="ghost" id="saveCsvBtn">💾 حفظ CSV</button>
+  </div>
+</header>
+
+<main>
+  <div class="panel">
+    <!-- لوحة الإدخال -->
+    <div class="card" style="max-width:420px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div style="font-weight:800">إضافة منتج للفاتورة</div>
+        <div class="small">اختيار سريع وإضافة</div>
+      </div>
+
+      <label>الصنف</label>
+      <select id="productSelect"></select>
+
+      <label style="margin-top:8px">الحجم</label>
+      <select id="sizeSelect"></select>
+
+      <div class="row" style="margin-top:8px">
+        <div>
+          <label>الكمية</label>
+          <input type="number" id="qtyInput" min="1" value="1"/>
+        </div>
+        <div>
+          <label>السعر (للواحد)</label>
+          <input type="number" id="priceInput" step="0.01" min="0"/>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button id="addItemBtn" style="flex:1;background:var(--accent);color:white;border-radius:8px;padding:10px">➕ إضافة للفـاتورة</button>
+        <button id="clearBtn" style="flex:0 0 90px;background:#f0f0f0;border-radius:8px">مسح</button>
+      </div>
+
+      <div style="margin-top:12px" class="small">
+        يمكنك تعديل الأسعار والكمية بعد الإضافة في جدول الفاتورة.
+      </div>
+    </div>
+
+    <!-- لوحة الفاتورة -->
+    <div class="card" style="flex:2;min-width:420px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div style="font-weight:800">الفاتورة</div>
+        <div class="small">يمكن حذف أي سطر أو تعديل الكمية والسعر</div>
+      </div>
+
+      <table id="invoiceTable" aria-label="الفاتورة">
+        <thead>
+          <tr>
+            <th>ص</th>
+            <th>الصنف</th>
+            <th>الحجم</th>
+            <th>الكمية</th>
+            <th>سعر الوحدة</th>
+            <th>الإجمالي</th>
+            <th>حذف</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+        <tfoot>
+          <tr>
+            <td colspan="5" class="right">المجموع الفرعي</td>
+            <td id="subtotal">0.00</td>
+            <td></td>
+          </tr>
+          <tr>
+            <td colspan="5" class="right">الضريبة (%)</td>
+            <td><input id="taxInput" type="number" value="0" min="0" step="0.1" style="width:100px;padding:6px;border-radius:6px;border:1px solid #e6f0f6"></td>
+            <td></td>
+          </tr>
+          <tr>
+            <td colspan="5" class="right">الخصم</td>
+            <td><input id="discountInput" type="number" value="0" min="0" step="0.01" style="width:100px;padding:6px;border-radius:6px;border:1px solid #e6f0f6"></td>
+            <td></td>
+          </tr>
+          <tr>
+            <td colspan="5" class="right">الإجمالي النهائي</td>
+            <td id="grandTotal" class="total-card">0.00</td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px">
+        <div class="small">حفظ تلقائي مؤقت داخل المتصفح: <button id="saveLocalBtn" style="margin-left:6px">احفظ محلياً</button></div>
+        <div class="actions">
+          <button id="clearInvoiceBtn" style="background:#ff6b6b;color:white;border-radius:8px;padding:8px 12px">🗑️ تفريغ الفاتورة</button>
+          <button id="downloadInvoiceBtn" style="background:#2e8ab8;color:white;border-radius:8px;padding:8px 12px">⬇️ تنزيل (CSV)</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+/* ====== بيانات المنتجات (عدلها كما تريد) ======
+  الشكل:
+  products = {
+    "عصير برتقال": {sizes: {"صغير":1.5,"وسط":2.5,"كبير":3.5}},
+    ...
+  }
+*/
+const products = {
+  "عصائر": { sizes: {"صغير":1.50,"وسط":2.50,"كبير":3.50} },
+  "آيس كريم فانيلا": { sizes: {"كوب صغير":2.00,"كوب وسط":3.00,"كوب كبير":4.50} },
+  "مياه معدنية": { sizes: {"330مل":0.30,"600مل":0.50,"1.5لتر":1.00} },
+  "موز": { sizes: {"كيلو":0.65} },
+  "سناك شيبس": { sizes: {"عادي":0.60,"كبير":1.20} }
+};
+
+/* ====== عناصر الواجهة ====== */
+const productSelect = document.getElementById('productSelect');
+const sizeSelect = document.getElementById('sizeSelect');
+const priceInput = document.getElementById('priceInput');
+const qtyInput = document.getElementById('qtyInput');
+const addItemBtn = document.getElementById('addItemBtn');
+const invoiceTableBody = document.querySelector('#invoiceTable tbody');
+const subtotalTd = document.getElementById('subtotal');
+const taxInput = document.getElementById('taxInput');
+const discountInput = document.getElementById('discountInput');
+const grandTotalTd = document.getElementById('grandTotal');
+const invoiceNoSpan = document.getElementById('invoiceNo');
+const nowLabel = document.getElementById('nowLabel');
+
+/* ====== حالة الفاتورة ====== */
+let invoice = { items: [] };
+
+/* ====== تهيئة القوائم ====== */
+function initProductList(){
+  productSelect.innerHTML = '';
+  const emptyOption = document.createElement('option'); emptyOption.textContent='-- اختر الصنف --'; emptyOption.value='';
+  productSelect.appendChild(emptyOption);
+  Object.keys(products).forEach(name=>{
+    const opt = document.createElement('option');
+    opt.value = name; opt.textContent = name;
+    productSelect.appendChild(opt);
+  });
+}
+function populateSizes(productName){
+  sizeSelect.innerHTML = '';
+  const sizes = products[productName]?.sizes || {};
+  Object.keys(sizes).forEach(sz=>{
+    const opt = document.createElement('option');
+    opt.value = sz; opt.textContent = `${sz} — ${Number(sizes[sz]).toFixed(2)}`;
+    sizeSelect.appendChild(opt);
+  });
+  // set price to first size
+  const first = Object.keys(sizes)[0];
+  if(first) priceInput.value = Number(sizes[first]).toFixed(2);
+}
+
+/* ====== إضافة عنصر للفاتورة ====== */
+function addItem(){
+  const prod = productSelect.value;
+  if(!prod){ alert('اختر صنف أولاً'); return; }
+  const size = sizeSelect.value;
+  const qty = parseFloat(qtyInput.value) || 0;
+  const price = parseFloat(priceInput.value) || 0;
+  if(qty <= 0){ alert('ادخل كمية صحيحة'); return; }
+  // push to invoice
+  invoice.items.push({ prod, size, qty, price });
+  renderInvoice();
+  saveToLocalTemp(); // autosave small
+}
+
+/* ====== عرض الفاتورة ====== */
+function renderInvoice(){
+  invoiceTableBody.innerHTML = '';
+  invoice.items.forEach((it, idx)=>{
+    const tr = document.createElement('tr');
+    const lineTotal = it.qty * it.price;
+    tr.innerHTML = `
+      <td>${idx+1}</td>
+      <td contenteditable="true" data-field="prod">${it.prod}</td>
+      <td contenteditable="true" data-field="size">${it.size}</td>
+      <td contenteditable="true" data-field="qty">${it.qty}</td>
+      <td contenteditable="true" data-field="price">${Number(it.price).toFixed(2)}</td>
+      <td data-field="line">${lineTotal.toFixed(2)}</td>
+      <td><button class="remove-btn" data-idx="${idx}">حذف</button></td>
+    `;
+    invoiceTableBody.appendChild(tr);
+  });
+  updateTotals();
+}
+
+/* ====== تحديث الإجماليات ====== */
+function updateTotals(){
+  let subtotal = 0;
+  invoice.items.forEach(it=>{
+    subtotal += it.qty * it.price;
+  });
+  const taxPercent = parseFloat(taxInput.value) || 0;
+  const discount = parseFloat(discountInput.value) || 0;
+  const taxAmount = subtotal * (taxPercent/100);
+  const grand = subtotal + taxAmount - discount;
+  subtotalTd.textContent = subtotal.toFixed(2);
+  grandTotalTd.textContent = grand.toFixed(2);
+  // update invoice items display (line totals) in case user edited cells
+  [...invoiceTableBody.rows].forEach((r,i)=>{
+    r.cells[5].textContent = ( (invoice.items[i].qty*invoice.items[i].price) || 0 ).toFixed(2);
+  });
+}
+
+/* ====== الاستماع للأحداث ====== */
+productSelect.addEventListener('change', (e)=>{
+  populateSizes(e.target.value);
+});
+sizeSelect.addEventListener('change', ()=>{
+  const prod = productSelect.value;
+  const sizes = products[prod]?.sizes || {};
+  if(sizes[sizeSelect.value] !== undefined) priceInput.value = Number(sizes[sizeSelect.value]).toFixed(2);
+});
+addItemBtn.addEventListener('click', addItem);
+document.getElementById('clearBtn').addEventListener('click', ()=>{
+  productSelect.value=''; sizeSelect.innerHTML=''; priceInput.value=''; qtyInput.value=1;
+});
+
+/* تعديل داخل جدول الفاتورة (محتوى قابل للتحرير) */
+invoiceTableBody.addEventListener('input', (e)=>{
+  const td = e.target.closest('td');
+  if(!td) return;
+  const row = td.parentElement;
+  const idx = Array.from(invoiceTableBody.rows).indexOf(row);
+  const field = td.getAttribute('data-field');
+  if(!field) return;
+  let val = td.textContent.trim();
+  if(field==='qty' || field==='price'){
+    val = parseFloat(val) || 0;
+  }
+  invoice.items[idx][field] = val;
+  // recompute line total and totals
+  row.cells[5].textContent = (invoice.items[idx].qty * invoice.items[idx].price).toFixed(2);
+  updateTotals();
+  saveToLocalTemp();
+});
+
+/* حذف سطر */
+invoiceTableBody.addEventListener('click', (e)=>{
+  if(e.target.matches('.remove-btn')){
+    const idx = parseInt(e.target.dataset.idx);
+    invoice.items.splice(idx,1);
+    renderInvoice();
+    saveToLocalTemp();
+  }
+});
+
+/* تغيرات الضريبة/الخصم */
+taxInput.addEventListener('input', updateTotals);
+discountInput.addEventListener('input', updateTotals);
+
+/* تنزيل CSV للفاتورة */
+function downloadCSV(){
+  if(invoice.items.length===0){ alert('الفاتورة فارغة'); return; }
+  const shopName = 'سامح للتجارة';
+  const now = new Date();
+  const headerMeta = [
+    ['محل', shopName],
+    ['فاتورة رقم', invoice.metadata?.no || invoiceNoSpan.textContent],
+    ['التاريخ', now.toLocaleString('ar-EG')]
+  ];
+  // CSV lines
+  const rows = [];
+  headerMeta.forEach(r => rows.push(r.join(',')));
+  rows.push('');
+  rows.push(['#','الصنف','الحجم','الكمية','سعر الوحدة','الإجمالي'].join(','));
+  invoice.items.forEach((it, i)=>{
+    const line = [
+      i+1,
+      `"${it.prod.replace(/"/g,'""')}"`,
+      `"${it.size.replace(/"/g,'""')}"`,
+      it.qty,
+      Number(it.price).toFixed(2),
+      (it.qty*it.price).toFixed(2)
+    ];
+    rows.push(line.join(','));
+  });
+  rows.push('');
+  rows.push(['','المجموع الفرعي', '', '', '', subtotalTd.textContent].join(','));
+  rows.push(['','الضريبة (%)', '', '', '', taxInput.value].join(','));
+  rows.push(['','الخصم', '', '', '', discountInput.value].join(','));
+  rows.push(['','الإجمالي النهائي', '', '', '', grandTotalTd.textContent].join(','));
+
+  const csv = rows.join('\n');
+  const blob = new Blob([csv], {type: 'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const filename = `invoice_${invoiceNoSpan.textContent.replace(/\s+/g,'_')}.csv`;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+/* حفظ مؤقت محلي (localStorage) */
+function saveToLocalTemp(){
+  try{
+    const data = { invoice, metadata: { no: invoiceNoSpan.textContent, time: new Date().toISOString() } };
+    localStorage.setItem('pos_invoice_temp', JSON.stringify(data));
+  }catch(e){}
+}
+function loadFromLocalTemp(){
+  try{
+    const raw = localStorage.getItem('pos_invoice_temp');
+    if(!raw) return;
+    const parsed = JSON.parse(raw);
+    invoice = parsed.invoice || {items:[]};
+    invoice.metadata = parsed.metadata;
+    renderInvoice();
+    if(invoice.metadata && invoice.metadata.no) invoiceNoSpan.textContent = invoice.metadata.no;
+  }catch(e){}
+}
+document.getElementById('saveLocalBtn').addEventListener('click', ()=>{
+  saveToLocalTemp();
+  alert('تم الحفظ محلياً في المتصفح');
+});
+
+/* تفريغ الفاتورة */
+document.getElementById('clearInvoiceBtn').addEventListener('click', ()=>{
+  if(!confirm('هل تريد تفريغ الفاتورة الحالية؟')) return;
+  invoice.items = [];
+  renderInvoice();
+  saveToLocalTemp();
+});
+
+/* زر تنزيل CSV */
+document.getElementById('downloadInvoiceBtn').addEventListener('click', downloadCSV);
+
+/* زر الحفظ السريع (header) */
+document.getElementById('saveCsvBtn').addEventListener('click', downloadCSV);
+
+/* طباعة - نجهز رؤوس الفاتورة في نافذة الطباعة */
+document.getElementById('printBtn').addEventListener('click', ()=>{
+  if(invoice.items.length===0){ if(!confirm('الفاتورة فارغة — اطبع؟')) return; }
+  // نجهز HTML للطباعة
+  const shopName = 'سامح للتجارة';
+  const now = new Date();
+  let html = `<html dir="rtl"><head><meta charset="utf-8"><title>فاتورة ${invoiceNoSpan.textContent}</title>`;
+  html += `<style>body{font-family:Tahoma,Arial;font-size:14px} .center{text-align:center} table{width:100%;border-collapse:collapse} th,td{border:1px solid #000;padding:6px;text-align:center}</style></head><body>`;
+  html += `<div class="center"><h2>${shopName}</h2><div>فاتورة #: ${invoiceNoSpan.textContent}</div><div>التاريخ: ${now.toLocaleString('ar-EG')}</div><hr/></div>`;
+  html += `<table><thead><tr><th>ص</th><th>الصنف</th><th>الحجم</th><th>الكمية</th><th>سعر الوحدة</th><th>الإجمالي</th></tr></thead><tbody>`;
+  invoice.items.forEach((it,i)=>{
+    html += `<tr><td>${i+1}</td><td>${it.prod}</td><td>${it.size}</td><td>${it.qty}</td><td>${Number(it.price).toFixed(2)}</td><td>${(it.qty*it.price).toFixed(2)}</td></tr>`;
+  });
+  html += `</tbody></table>`;
+  html += `<div style="margin-top:10px"><strong>المجموع الفرعي:</strong> ${subtotalTd.textContent} &nbsp;&nbsp; <strong>الضريبة(%):</strong> ${taxInput.value} &nbsp;&nbsp; <strong>الخصم:</strong> ${discountInput.value}</div>`;
+  html += `<h3>الإجمالي النهائي: ${grandTotalTd.textContent} ريال</h3>`;
+  html += `<div style="margin-top:20px">شكراً لتعاملكم معنا 💚</div></body></html>`;
+  const w = window.open('', '_blank');
+  w.document.write(html);
+  w.document.close();
+  w.focus();
+  setTimeout(()=>w.print(), 300);
+});
+
+/* مولد رقم فاتورة بسيط */
+function genInvoiceNo(){
+  const d = new Date();
+  const y = d.getFullYear().toString().slice(-2);
+  const mm = String(d.getMonth()+1).padStart(2,'0');
+  const dd = String(d.getDate()).padStart(2,'0');
+  const hh = String(d.getHours()).padStart(2,'0');
+  const min = String(d.getMinutes()).padStart(2,'0');
+  return `INV${y}${mm}${dd}-${hh}${min}-${Math.floor(Math.random()*900+100)}`;
+}
+
+/* تهيئة الصفحة */
+function init(){
+  invoice.metadata = invoice.metadata || {};
+  invoiceNoSpan.textContent = invoice.metadata.no || genInvoiceNo();
+  nowLabel.textContent = new Date().toLocaleString('ar-EG');
+  initProductList();
+  loadFromLocalTemp();
+  // auto-populate sizes if product selected
+  productSelect.addEventListener('change', ()=>populateSizes(productSelect.value));
+  // set initial product to first available
+  const firstProd = Object.keys(products)[0];
+  if(firstProd){ productSelect.value = firstProd; populateSizes(firstProd); }
+  // connect add on Enter key for qty/price fields
+  [qtyInput, priceInput].forEach(inp=>{
+    inp.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ addItem(); }});
+  });
+  renderInvoice();
+}
+init();
+
+/* تحديث الـــ "now" كل دقيقة */
+setInterval(()=>{ nowLabel.textContent = new Date().toLocaleString('ar-EG'); }, 60000);
+
+</script>
+
+</body>
+</html>

@@ -1,0 +1,111 @@
+import tkinter as tk
+from tkinter import messagebox, ttk
+
+# قائمة منتجات تجريبية
+products = [f"منتج {i+1}" for i in range(1, 31)]
+prices = {p: round(5 + i * 0.5, 2) for i, p in enumerate(products)}
+
+cart = {}
+
+# إضافة منتج للسلة
+def add_to_cart(product):
+    cart[product] = cart.get(product, 0) + 1
+    update_cart_display()
+
+# تحديث عرض السلة
+def update_cart_display():
+    for item in cart_tree.get_children():
+        cart_tree.delete(item)
+    total = 0
+    for product, qty in cart.items():
+        price = prices[product]
+        subtotal = price * qty
+        total += subtotal
+        cart_tree.insert("", "end", values=(product, qty, f"{subtotal:.2f} ر.س"))
+    total_label.config(text=f"الإجمالي: {total:.2f} ر.س")
+
+# حذف منتج محدد
+def remove_selected():
+    selected = cart_tree.selection()
+    if not selected:
+        messagebox.showwarning("تنبيه", "اختر منتجًا للحذف.")
+        return
+    for item in selected:
+        name = cart_tree.item(item, "values")[0]
+        del cart[name]
+    update_cart_display()
+
+# إتمام البيع
+def complete_sale():
+    if not cart:
+        messagebox.showinfo("تنبيه", "السلة فارغة.")
+        return
+    messagebox.showinfo("تم", "تم إتمام عملية البيع بنجاح!")
+    cart.clear()
+    update_cart_display()
+
+# طباعة الفاتورة (محاكاة)
+def print_invoice():
+    messagebox.showerror("خطأ في الطباعة", "حدث خطأ أثناء الطباعة: StartDoc failed")
+
+# واجهة البرنامج
+root = tk.Tk()
+root.title("نظام نقاط البيع - POS")
+root.geometry("950x600")
+root.configure(bg="#f0f0f0")
+
+# الإطار الأيمن (قائمة المنتجات)
+product_frame = tk.LabelFrame(root, text="قائمة المنتجات", font=("Arial", 12, "bold"), bg="#f8f8f8")
+product_frame.pack(side="right", fill="both", expand=True, padx=10, pady=10)
+
+canvas = tk.Canvas(product_frame, bg="#f8f8f8")
+scrollbar = ttk.Scrollbar(product_frame, orient="vertical", command=canvas.yview)
+scrollable_frame = tk.Frame(canvas, bg="#f8f8f8")
+
+scrollable_frame.bind(
+    "<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+)
+canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+canvas.configure(yscrollcommand=scrollbar.set)
+
+for p in products:
+    btn = tk.Button(
+        scrollable_frame,
+        text=f"{p}\n{prices[p]} ر.س",
+        width=15,
+        height=3,
+        bg="#d7ecff",
+        relief="raised",
+        command=lambda p=p: add_to_cart(p),
+    )
+    btn.pack(padx=5, pady=5, side="left")
+
+canvas.pack(side="left", fill="both", expand=True)
+scrollbar.pack(side="right", fill="y")
+
+# الإطار الأيسر (السلة)
+cart_frame = tk.LabelFrame(root, text="سلة البيع", font=("Arial", 12, "bold"), bg="#fafafa")
+cart_frame.pack(side="left", fill="y", padx=10, pady=10)
+
+columns = ("المنتج", "الكمية", "الإجمالي")
+cart_tree = ttk.Treeview(cart_frame, columns=columns, show="headings", height=20)
+for col in columns:
+    cart_tree.heading(col, text=col)
+    cart_tree.column(col, anchor="center", width=120)
+cart_tree.pack(pady=5)
+
+# الإجمالي
+total_label = tk.Label(cart_frame, text="الإجمالي: 0.00 ر.س", font=("Arial", 12, "bold"), bg="#fafafa", fg="#333")
+total_label.pack(pady=5)
+
+# الأزرار
+btn_remove = tk.Button(cart_frame, text="حذف المحدد", bg="#ffdddd", width=20, command=remove_selected)
+btn_remove.pack(pady=3)
+
+btn_complete = tk.Button(cart_frame, text="إتمام البيع", bg="#ddffdd", width=20, command=complete_sale)
+btn_complete.pack(pady=3)
+
+btn_print = tk.Button(cart_frame, text="طباعة الفاتورة", bg="#ddddff", width=20, command=print_invoice)
+btn_print.pack(pady=3)
+
+root.mainloop()

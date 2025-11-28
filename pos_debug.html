@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>POS Debug</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.rtl.min.css" rel="stylesheet" />
+  <style>
+    body{font-family:Arial, sans-serif;padding:12px}
+    .category-active{background:#0069ff;color:#fff}
+    .product-card{cursor:pointer;border:1px solid #ddd;padding:8px;border-radius:6px;text-align:center}
+    .order-item{border-bottom:1px dashed #eee;padding:6px 0}
+  </style>
+</head>
+<body>
+  <h4>POS - Debug</h4>
+
+  <div id="loginPage">
+    <input id="user" placeholder="admin" class="form-control mb-1" />
+    <input id="pass" placeholder="1234" class="form-control mb-1" type="password" />
+    <button id="loginBtn" class="btn btn-primary mb-2">دخول</button>
+  </div>
+
+  <div id="mainPOS" style="display:none">
+    <div>
+      <input id="search" class="form-control mb-2" placeholder="بحث..." />
+      <div id="categoryContainer" class="mb-2"></div>
+      <div id="productsContainer" class="row g-2 mb-2"></div>
+    </div>
+
+    <div class="card p-2">
+      <h6>الفاتورة</h6>
+      <div id="orderList" style="min-height:80px"></div>
+      <div>المجموع: <span id="total">0.000</span></div>
+      <button id="finishBtn" class="btn btn-success">حفظ</button>
+      <button id="printBtn" class="btn btn-secondary">طباعة</button>
+    </div>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+/* ---------- Global error catcher (shows alerts for uncaught errors) ---------- */
+window.onerror = function(message, source, lineno, colno, error){
+  console.error("GlobalError:", message, "at", source + ":" + lineno + ":" + colno);
+  alert("حدث خطأ: " + message + "\nانظر Console للمزيد.");
+};
+
+/* ---------- بيانات ---------- */
+const categories = ["فريش","كوكتيلات","ايس كريم"];
+const products = [
+  {id:1, name:"مانجو", base:1.0, cat:"فريش"},
+  {id:2, name:"جوافة", base:1.0, cat:"فريش"},
+  {id:3, name:"فراولة", base:1.2, cat:"كوكتيلات"}
+];
+const sizes = {"صغير":1, "وسط":1.3};
+
+let currentCategory = categories[0];
+let order = [];
+let selectedProduct = null;
+let selectedSize = null;
+
+/* ---------- دوال مع تتبع لوج ---------- */
+function log(...a){ console.log("LOG:", ...a); }
+
+function renderCategories(){
+  log("renderCategories");
+  const box = document.getElementById('categoryContainer');
+  box.innerHTML='';
+  categories.forEach(cat=>{
+    const b = document.createElement('button');
+    b.className = 'btn btn-sm me-1 mb-1 ' + (cat===currentCategory ? 'category-active' : 'btn-outline-secondary');
+    b.textContent = cat;
+    b.onclick = ()=>{ currentCategory = cat; renderCategories(); renderProducts(); };
+    box.appendChild(b);
+  });
+}
+
+function renderProducts(){
+  log("renderProducts - category:", currentCategory, "search:", document.getElementById('search').value);
+  const box = document.getElementById('productsContainer');
+  box.innerHTML='';
+  const s = document.getElementById('search').value.trim();
+  products.filter(p => p.cat===currentCategory && p.name.includes(s)).forEach(p=>{
+    const col = document.createElement('div');
+    col.className='col-6 col-md-4';
+    col.innerHTML = `<div class="product-card"><div>${p.name}</div><div>${p.base.toFixed(3)}</div></div>`;
+    col.onclick = ()=>{ log("product clicked", p); chooseSize(p.id); };
+    box.appendChild(col);
+  });
+}
+
+function chooseSize(id){
+  log("chooseSize", id);
+  selectedProduct = products.find(pp=>pp.id===id);
+  if(!selectedProduct){ log("product not found!"); return; }
+  // لأغراض التشخيص نضيف مباشرة عنصر للسلة
+  const qty = 1;
+  const size = Object.keys(sizes)[0];
+  const price = selectedProduct.base * sizes[size] * qty;
+  order.push({name:selectedProduct.name, size, qty, price});
+  renderOrder();
+}
+
+function renderOrder(){
+  log("renderOrder", order.length);
+  const box = document.getElementById('orderList');
+  box.innerHTML='';
+  order.forEach((i, idx)=>{
+    const d = document.createElement('div');
+    d.className='order-item d-flex justify-content-between';
+    d.innerHTML = `<div>${i.name} (${i.size}) x ${i.qty}</div><div>${i.price.toFixed(3)}</div>`;
+    d.onclick = ()=>{ order.splice(idx,1); renderOrder(); };
+    box.appendChild(d);
+  });
+  const total = order.reduce((s,i)=>s+i.price,0);
+  document.getElementById('total').textContent = total.toFixed(3);
+}
+
+/* دوال انتهاء وحفظ وطباعة */
+function finishOrder(){
+  log("finishOrder called");
+  if(order.length===0){ alert("السلة فارغة"); return; }
+  const today = new Date().toISOString().slice(0,10);
+  const key = 'pos_orders_'+today;
+  const arr = JSON.parse(localStorage.getItem(key) || "[]");
+  arr.push({time:new Date().toLocaleString(), total: order.reduce((s,i)=>s+i.price,0), items: order});
+  localStorage.setItem(key, JSON.stringify(arr));
+  order = []; renderOrder();
+  alert("تم الحفظ محلياً");
+}
+
+function printBill(){
+  log("printBill");
+  if(order.length===0){ alert("لا يوجد عناصر"); return; }
+  const html = "<html><body><h3>فاتورة</h3><pre>" + JSON.stringify(order, null, 2) + "</pre></body></html>";
+  const w = window.open('','_blank'); w.document.write(html); w.document.close();
+}
+
+/* ---------- init ---------- */
+function initApp(){
+  log("initApp");
+  document.getElementById('loginBtn').onclick = ()=>{
+    const u = document.getElementById('user').value.trim();
+    const p = document.getElementById('pass').value;
+    log("login attempt", u);
+    if(u==='admin' && p==='1234'){
+      document.getElementById('loginPage').style.display='none';
+      document.getElementById('mainPOS').style.display='block';
+      renderCategories(); renderProducts();
+    } else alert('بيانات غير صحيحة');
+  };
+
+  document.getElementById('finishBtn').onclick = finishOrder;
+  document.getElementById('printBtn').onclick = printBill;
+  document.getElementById('search').oninput = renderProducts;
+}
+
+if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', initApp); else initApp();
+</script>
+</body>
+</html>

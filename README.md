@@ -1,16 +1,11 @@
 
-# Cashire Oman
+  # Cashier Screen for Juice Products
 
-هذا المشروع يضم مجموعة من التطبيقات التي تم تطويرها لتعلم تقنيات مختلفة في البرمجة. يحتوي المشروع على أكواد وأمثلة لبناء واجهات متعددة تتضمن:
+  This is a code bundle for Cashier Screen for Juice Products. The original project is available at https://www.figma.com/design/XDRzAl4gAfZrZAVLODXC3a/Cashier-Screen-for-Juice-Products.
 
-- واجهات إدخال
-- واجهة نظام بصمة لتسجيل الدوام
-- واجهة كاشير للعصائر
-- وغيرها من الأمثلة التي تم تعلمها خلال رحلة التعلم
+  ## Running the code
 
-## التقنيات المستخدمة:
-- **بايثون**: تم استخدام بايثون في بعض التطبيقات مثل نظام تسجيل الحضور (البصمة) وبعض الأكواد الأخرى.
-- **جافا**: تم استخدام جافا في تطبيقات أخرى تتطلب إمكانيات معينة.
-- **HTML / CSS / JavaScript**: تم استخدامها لبناء واجهات المستخدم (مثل واجهات الكاشير وواجهات الإدخال).
+  Run `npm i` to install the dependencies.
+
+  Run `npm run dev` to start the development server.
   
-## الهيكل العام للمشروع:
